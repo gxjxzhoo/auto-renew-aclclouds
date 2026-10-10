@@ -242,24 +242,42 @@ export async function solveCapWidget(page, scope = '') {
 }
 
 /**
- * 登录页验证码（2026-10-11 实测为新版明 DOM）：
- * div.captcha > div.captcha-trigger[role="button"]，点击后 label
- * "Vérifier que vous êtes humain" → "Vérification…" → "Vérifié"。
- * 无 shadow DOM、无 <cap-widget>、无隐藏 input。
+ * 登录页验证码文案判定（纯函数，可单测）。
+ * 成功态：法语 Vérifié / 英语 You're human（checkbox 版）。
+ * 注意英文版初始文案是 "Verify you're human"，必须排除 "verify" 才能判定成功。
+ * @returns {'ok'|'error'|null}
+ */
+export function classifyLoginCaptchaText(raw) {
+  const t = String(raw || '').toLowerCase();
+  if (/vérifié/.test(t) || (/\byou['’]re human\b/.test(t) && !/verify/.test(t))) return 'ok';
+  if (/erreur|error/.test(t)) return 'error';
+  return null;
+}
+
+/**
+ * 登录页验证码。
+ * 两种形态（2026-10-11 实测）：
+ * - 明 DOM：div.captcha > div.captcha-trigger[role="button"]，
+ *   点击后 "Vérifier que vous êtes humain" → "Vérification…" → "Vérifié"
+ * - checkbox（en-US 下）："Verify you're human" → "You're human"（带绿勾）
  */
 export async function solveLoginCaptcha(page) {
   const trigger = page.locator('.captcha-trigger, div.captcha [role="button"]').first();
   if ((await trigger.count()) > 0) {
     await trigger.scrollIntoViewIfNeeded().catch(() => {});
     await trigger.click({ timeout: 10000 });
-    log('已点击登录页 Cap，等待 Vérifié...');
-    const st = await page.waitForFunction(() => {
-      const el = document.querySelector('.captcha-trigger, div.captcha');
-      const t = ((el && el.innerText) || '').toLowerCase();
-      if (/vérifié|verified/.test(t)) return 'ok';
-      if (/erreur|error/.test(t)) return 'error';
-      return null;
-    }, undefined, { timeout: 120000 }).then((h) => h.jsonValue()).catch(() => null);
+    log('已点击登录页 Cap，等待验证通过...');
+    // 判定逻辑与 classifyLoginCaptchaText 同一份（序列化进页面执行），避免两处漂移
+    const st = await page.waitForFunction(
+      ({ src }) => {
+        // eslint-disable-next-line no-new-func
+        const classify = new Function(`return (${src})`)();
+        const el = document.querySelector('.captcha-trigger, div.captcha');
+        return classify(el ? el.innerText : '');
+      },
+      { src: classifyLoginCaptchaText.toString() },
+      { timeout: 120000 }
+    ).then((h) => h.jsonValue()).catch(() => null);
     if (st === 'error') throw new Error('登录页 Cap 返回 Erreur');
     if (st !== 'ok') throw new Error('登录页 Cap 超时未完成');
     log('登录页 Cap 通过');

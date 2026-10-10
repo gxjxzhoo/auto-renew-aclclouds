@@ -1,6 +1,21 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { maskAccount, escapeHtml, fetchWithRetry } from '../common.mjs';
+import { maskAccount, escapeHtml, fetchWithRetry, classifyLoginCaptchaText } from '../common.mjs';
+
+test('classifyLoginCaptchaText: 成功/初始/错误态', () => {
+  // 法语明 DOM 版
+  assert.equal(classifyLoginCaptchaText('Vérifié'), 'ok');
+  assert.equal(classifyLoginCaptchaText('Vérifier que vous êtes humain'), null);
+  assert.equal(classifyLoginCaptchaText('Vérification…'), null);
+  // 英语 checkbox 版：成功是 "You're human"，初始 "Verify you're human" 不能误判
+  assert.equal(classifyLoginCaptchaText("You're human"), 'ok');
+  assert.equal(classifyLoginCaptchaText("You're human\nCap"), 'ok');
+  assert.equal(classifyLoginCaptchaText("Verify you're human"), null);
+  assert.equal(classifyLoginCaptchaText(''), null);
+  assert.equal(classifyLoginCaptchaText(null), null);
+  // 错误态
+  assert.equal(classifyLoginCaptchaText('Erreur de vérification'), 'error');
+});
 
 test('maskAccount: 邮箱 / 短名 / 空值', () => {
   assert.equal(maskAccount('user@example.com'), 'u***r@example.com');

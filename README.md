@@ -5,7 +5,7 @@ ACLClouds Free Bot 托管自动续期。Free 套餐约 4 天到期，到期前 2
 ## 做什么
 
 1. Playwright 打开 `/auth/login`，填 `ACL_USERNAME` / `ACL_PASSWORD`
-2. 过登录页 **Cap** 人机验证（2026-10-11 起为明 DOM 实现：`div.captcha > div.captcha-trigger[role="button"]`，点击等 "Vérifié"；旧版 `<cap-widget>` 保留兜底）
+2. 过登录页 **Cap** 人机验证（两种形态：明 DOM `div.captcha > div.captcha-trigger[role="button"]`，点击等 "Vérifié"；en-US 下为 checkbox 版 "Verify you're human" → "You're human"；旧版 `<cap-widget>` 保留兜底）
 3. 登录进 dashboard，调 `/api/client` 发现真实 server id（含 `expires_at`）
 4. `POST /api/client/servers/{id}/upgrade/renew`
    - `200` 续期成功（刷新到期时间）
@@ -116,7 +116,7 @@ node with-env.cjs
 **已完成**
 
 - 账号密码登录，不再依赖手动导出 session cookie
-- **Cap 验证码**：登录页新版明 DOM（`div.captcha-trigger`，等 "Vérifié"）；续费弹窗 `<cap-widget>` 三通道 token 捕获 + error 事件监听
+- **Cap 验证码**：登录页明 DOM（`div.captcha-trigger`，等 "Vérifié"；en-US checkbox 版等 "You're human"，注意与初始文案 "Verify you're human" 区分）；续费弹窗 `<cap-widget>` 三通道 token 捕获 + error 事件监听
 - 自动发现真实 Pterodactyl server id
 - 续期接口打通；窗口外返回 `renewal_not_available` 视为正常
 - `403 captcha_required` 走 Confirmation anti-robot 弹窗复刻人工流程（Cap token 必须经浏览器实时验证签发，裸调 API 固定 403）
