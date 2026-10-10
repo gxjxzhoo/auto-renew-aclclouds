@@ -267,17 +267,17 @@ export async function solveLoginCaptcha(page) {
     await trigger.scrollIntoViewIfNeeded().catch(() => {});
     await trigger.click({ timeout: 10000 });
     log('已点击登录页 Cap，等待验证通过...');
-    // 判定逻辑与 classifyLoginCaptchaText 同一份（序列化进页面执行），避免两处漂移
-    const st = await page.waitForFunction(
-      ({ src }) => {
-        // eslint-disable-next-line no-new-func
-        const classify = new Function(`return (${src})`)();
-        const el = document.querySelector('.captcha-trigger, div.captcha');
-        return classify(el ? el.innerText : '');
-      },
-      { src: classifyLoginCaptchaText.toString() },
-      { timeout: 120000 }
-    ).then((h) => h.jsonValue()).catch(() => null);
+    // 注意：checkbox 版的 .captcha-trigger 位于 cap-widget 的 open shadow root 内，
+    // document.querySelector 穿不透 shadow DOM（永远返回 null），必须用 locator
+    //（Playwright 可穿透）取 innerText 轮询；判定逻辑复用 classifyLoginCaptchaText
+    const label = page.locator('.captcha-trigger, div.captcha [role="button"]').first();
+    const deadline = Date.now() + 120000;
+    let st = null;
+    while (Date.now() < deadline && !st) {
+      const t = await label.innerText().catch(() => '');
+      st = classifyLoginCaptchaText(t);
+      if (!st) await page.waitForTimeout(1000);
+    }
     if (st === 'error') throw new Error('登录页 Cap 返回 Erreur');
     if (st !== 'ok') throw new Error('登录页 Cap 超时未完成');
     log('登录页 Cap 通过');
