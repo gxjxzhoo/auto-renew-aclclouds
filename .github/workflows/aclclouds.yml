@@ -106,7 +106,7 @@ jobs:
       # 失败时保留截图（仅 3 天），方便排查验证码/选择器问题；shots 里可能有账号页面，勿把仓库设为公开
       - name: 上传失败截图
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: renew-shots-${{ github.run_id }}
           path: shots/
@@ -218,7 +218,7 @@ jobs:
       # 失败时保留截图（仅 3 天），方便排查验证码/选择器问题；shots 里可能有账号页面，勿把仓库设为公开
       - name: 上传失败截图
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: power-shots-${{ github.run_id }}
           path: shots/
