@@ -80,6 +80,10 @@ Secrets：
 
 Variable（可选）：`ACL_BASE_URL`，默认 `https://aclclouds.com`
 
+调试变量（Variables，可选，都不设即默认行为）：
+- `PW_CHANNEL`：设为 `chromium` 则用新版 headless（更接近真实浏览器，验证码被拦时试试）
+- `ACL_LOCALE`：浏览器语言，默认 `en-US`（站点验证码文案随语言变化）
+
 运行记录保留：每个 job 末尾 `if: always()` 清理，仅保留最近 10 条（保活每天跑 2 次，3 条不够排查）。
 
 ## 代码结构
@@ -96,6 +100,7 @@ Variable（可选）：`ACL_BASE_URL`，默认 `https://aclclouds.com`
 - **失败排查**：任一步骤失败会把 `shots/` 上传为 Artifact（保留 3 天）。截图可能含账号页面，**仓库请保持私有**。
 - **前置步骤失败兜底**：装依赖 / 下载 sing-box 等在脚本之前失败时，脚本没机会发 TG，工作流会用 curl 补发一条带运行链接的提醒。
 - **CI**：`.github/workflows/ci.yml` 在 push / PR 时做语法检查 + 单元测试（`npm test`，无需安装 playwright）。
+- **验证码诊断**：`login()` 里挂了 `attachDiagnostics`（控制台报错、请求失败、4xx/5xx、cap 域名请求都记环形日志），验证码失败时 `dumpCaptchaDiag` 把控件文本/HTML 和最近事件打到日志，方便排查卡住原因。
 - **依赖更新**：`.github/dependabot.yml` 每周检查 GitHub Actions 与 npm 依赖。Playwright 已固定为精确版本 `1.49.1`。
 - ⚠️ **GitHub 会在仓库 60 天无活动后自动停用定时工作流**（公开仓库尤其明显）。如果某天通知突然不再来，先去 Actions 页面看工作流是否被停用，手动 Enable 即可。
 - 建议在本地执行一次 `npm install` 并提交生成的 `package-lock.json`，之后把工作流里的 `npm install` 改成 `npm ci`，保证依赖可复现。

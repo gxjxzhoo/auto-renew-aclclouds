@@ -357,12 +357,14 @@ async function main() {
     ],
     ...(execPath ? { executablePath: execPath } : {}),
     ...(net.proxyUrl ? { proxy: { server: net.proxyUrl } } : {}),
+    // 可选：PW_CHANNEL=chromium 用新版 headless（更接近真实浏览器，验证码被拦时试试）
+    ...(process.env.PW_CHANNEL ? { channel: process.env.PW_CHANNEL } : {}),
   });
   const context = await browser.newContext({
     viewport: { width: 1440, height: 900 },
     userAgent:
       'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-    locale: 'en-US',
+    locale: process.env.ACL_LOCALE || 'en-US',
     storageState: fs.existsSync(AUTH) ? AUTH : undefined,
   });
   await context.addInitScript(() => {

@@ -97,6 +97,10 @@ jobs:
           NODE_LINK: ${{ secrets.NODE_LINK }}
           SING_BOX_BIN: ~/sing-box-bin/sing-box
           SING_BOX_SHA256: ${{ secrets.SING_BOX_SHA256 }}
+          # 可选：设为 chromium 使用新版 headless（更接近真实浏览器，验证码被拦时试试）
+          PW_CHANNEL: ${{ vars.PW_CHANNEL }}
+          # 可选：浏览器语言（默认 en-US；站点文案随语言变化，如需 fr-FR 在 Variables 里设 ACL_LOCALE）
+          ACL_LOCALE: ${{ vars.ACL_LOCALE }}
         run: node renew.mjs
 
       # 失败时保留截图（仅 3 天），方便排查验证码/选择器问题；shots 里可能有账号页面，勿把仓库设为公开
@@ -205,6 +209,10 @@ jobs:
           NODE_LINK: ${{ secrets.NODE_LINK }}
           SING_BOX_BIN: ~/sing-box-bin/sing-box
           SING_BOX_SHA256: ${{ secrets.SING_BOX_SHA256 }}
+          # 可选：设为 chromium 使用新版 headless（更接近真实浏览器，验证码被拦时试试）
+          PW_CHANNEL: ${{ vars.PW_CHANNEL }}
+          # 可选：浏览器语言（默认 en-US；站点文案随语言变化，如需 fr-FR 在 Variables 里设 ACL_LOCALE）
+          ACL_LOCALE: ${{ vars.ACL_LOCALE }}
         run: node power.mjs
 
       # 失败时保留截图（仅 3 天），方便排查验证码/选择器问题；shots 里可能有账号页面，勿把仓库设为公开

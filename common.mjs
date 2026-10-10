@@ -160,6 +160,52 @@ export function resolveExecutablePath() {
   return undefined;
 }
 
+/* ---------------- 诊断（验证码卡住时用） ---------------- */
+
+const diagBuf = [];
+function diagPush(line) {
+  diagBuf.push(`${new Date().toISOString().slice(11, 23)} ${line}`.slice(0, 300));
+  if (diagBuf.length > 60) diagBuf.shift();
+}
+
+/** 挂监听：控制台报错、请求失败、4xx/5xx 响应、以及任何发往 cap 域名的请求 */
+export function attachDiagnostics(page) {
+  page.on('console', (m) => {
+    if (['error', 'warning'].includes(m.type())) diagPush(`console.${m.type()}: ${m.text()}`);
+  });
+  page.on('pageerror', (e) => diagPush(`pageerror: ${e.message}`));
+  page.on('requestfailed', (r) => {
+    let host = '';
+    try { host = new URL(r.url()).host; } catch {}
+    diagPush(`requestfailed ${r.method()} ${host}${new URL(r.url()).pathname} : ${r.failure()?.errorText}`);
+  });
+  page.on('response', (r) => {
+    let u;
+    try { u = new URL(r.url()); } catch { return; }
+    if (r.status() >= 400 || /cap/i.test(u.host)) diagPush(`resp ${r.status()} ${u.host}${u.pathname}`);
+  });
+}
+
+/** 验证码失败时把页面状态和最近的网络/控制台事件打到日志 */
+export async function dumpCaptchaDiag(page) {
+  try {
+    const info = await page.evaluate(() => {
+      const el = document.querySelector('div.captcha, .captcha-trigger');
+      return {
+        text: ((el && el.innerText) || '').slice(0, 120),
+        html: ((el && el.outerHTML) || '').slice(0, 500),
+        webdriver: navigator.webdriver,
+        ua: navigator.userAgent,
+      };
+    });
+    log(`[diag] 验证码控件文本: ${JSON.stringify(info.text)} webdriver=${info.webdriver}`);
+    log(`[diag] 验证码控件 HTML: ${info.html}`);
+  } catch (e) {
+    log(`[diag] 读取页面状态失败: ${e.message}`);
+  }
+  log(`[diag] 最近事件(${diagBuf.length}):\n${diagBuf.join('\n') || '(无)'}`);
+}
+
 /* ---------------- 验证码 ---------------- */
 
 /**
@@ -307,6 +353,7 @@ export async function loggedIn(page) {
  */
 export async function login(page, shot, { base, user, pass, authPath }) {
   log(`登录 ${base}（${maskAccount(user)}）`);
+  attachDiagnostics(page);
   await page.goto(`${base}/auth/login`, { waitUntil: 'networkidle' }).catch(() =>
     page.goto(`${base}/auth/login`, { waitUntil: 'domcontentloaded' })
   );
@@ -332,6 +379,7 @@ export async function login(page, shot, { base, user, pass, authPath }) {
       authed = true;
     } catch (e) {
       log(`登录验证码失败(${i + 1}/4): ${e.message}`);
+      await dumpCaptchaDiag(page);
       await shot(page, `01-login-retry${i + 1}.png`);
       await page.reload({ waitUntil: 'domcontentloaded' });
       await page.waitForTimeout(1500);
