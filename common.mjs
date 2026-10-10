@@ -188,18 +188,14 @@ export function attachDiagnostics(page) {
 
 /** 验证码失败时把页面状态和最近的网络/控制台事件打到日志 */
 export async function dumpCaptchaDiag(page) {
+  // 用 locator 取（可穿透 open shadow DOM）；document.querySelector 在 shadow 内永远是 null
   try {
-    const info = await page.evaluate(() => {
-      const el = document.querySelector('div.captcha, .captcha-trigger');
-      return {
-        text: ((el && el.innerText) || '').slice(0, 120),
-        html: ((el && el.outerHTML) || '').slice(0, 500),
-        webdriver: navigator.webdriver,
-        ua: navigator.userAgent,
-      };
-    });
-    log(`[diag] 验证码控件文本: ${JSON.stringify(info.text)} webdriver=${info.webdriver}`);
-    log(`[diag] 验证码控件 HTML: ${info.html}`);
+    const el = page.locator('.captcha-trigger, div.captcha, cap-widget').first();
+    const text = await el.innerText({ timeout: 3000 }).catch(() => '(取不到文本)');
+    const html = await el.evaluate((n) => n.outerHTML, undefined, { timeout: 3000 }).catch(() => '(取不到 HTML)');
+    const env = await page.evaluate(() => ({ webdriver: navigator.webdriver, ua: navigator.userAgent, lang: navigator.language }));
+    log(`[diag] 验证码控件文本: ${JSON.stringify(String(text).slice(0, 120))} webdriver=${env.webdriver} lang=${env.lang}`);
+    log(`[diag] 验证码控件 HTML: ${String(html).slice(0, 500)}`);
   } catch (e) {
     log(`[diag] 读取页面状态失败: ${e.message}`);
   }
