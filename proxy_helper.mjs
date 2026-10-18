@@ -53,6 +53,13 @@ export async function setupProxy(log) {
 }
 
 async function _setup(log) {
+  // 前一步 gxjxzhoo/Node_Proxy Action 已起好代理（跨 step 常驻），直接用
+  const ext = (process.env.NODE_PROXY_URL || '').trim();
+  if (ext) {
+    const ip = (process.env.NODE_PROXY_IP || '').trim() || null;
+    log(`使用 Node_Proxy Action 提供的本地代理，出口 IP: ${ip || '未知'}`);
+    return { proxyUrl: ext, exitIp: ip, mode: '代理', stop: async () => {} };
+  }
   const nodeLink = (process.env.NODE_LINK || '').trim();
   if (!nodeLink) {
     log('未配置 NODE_LINK，直连');
