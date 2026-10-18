@@ -86,12 +86,14 @@ jobs:
 
       # 本地代理用的 sing-box 二进制（参考 hohai；node_proxy.py 优先用 SING_BOX_BIN）
       - name: Restore sing-box cache
+        if: env.NODE_PROXY_URL == ''
         uses: actions/cache@v6
         with:
           path: ~/sing-box-bin/sing-box
           key: sing-box-v1.14.1-linux-amd64
 
       - name: Prepare sing-box
+        if: env.NODE_PROXY_URL == ''
         run: |
           mkdir -p ~/sing-box-bin
           if [ ! -x ~/sing-box-bin/sing-box ]; then
@@ -227,12 +229,14 @@ jobs:
 
       # 本地代理用的 sing-box 二进制（参考 hohai；node_proxy.py 优先用 SING_BOX_BIN）
       - name: Restore sing-box cache
+        if: env.NODE_PROXY_URL == ''
         uses: actions/cache@v6
         with:
           path: ~/sing-box-bin/sing-box
           key: sing-box-v1.14.1-linux-amd64
 
       - name: Prepare sing-box
+        if: env.NODE_PROXY_URL == ''
         run: |
           mkdir -p ~/sing-box-bin
           if [ ! -x ~/sing-box-bin/sing-box ]; then
