@@ -62,6 +62,13 @@ jobs:
           fi
           rm -rf .shared-env
 
+      - name: 启动代理（Node_Proxy）
+        id: proxy
+        continue-on-error: true
+        uses: gxjxzhoo/Node_Proxy@main
+        with:
+          node-link: ${{ env.NODE_LINK || secrets.NODE_LINK }}
+
       - uses: actions/setup-node@v7
         with:
           node-version: '22'
@@ -117,6 +124,7 @@ jobs:
           # 本地代理（参考 hohai）：为空则直连；代理失败自动回退直连
           NODE_LINK: ${{ env.NODE_LINK || secrets.NODE_LINK }}
           SING_BOX_BIN: ~/sing-box-bin/sing-box
+          NODE_PROXY_IP: ${{ steps.proxy.outputs.exit-ip }}
           SING_BOX_SHA256: ${{ env.SING_BOX_SHA256 || secrets.SING_BOX_SHA256 }}
           # 可选：设为 chromium 使用新版 headless（更接近真实浏览器，验证码被拦时试试）
           PW_CHANNEL: ${{ vars.PW_CHANNEL }}
@@ -195,6 +203,13 @@ jobs:
           fi
           rm -rf .shared-env
 
+      - name: 启动代理（Node_Proxy）
+        id: proxy
+        continue-on-error: true
+        uses: gxjxzhoo/Node_Proxy@main
+        with:
+          node-link: ${{ env.NODE_LINK || secrets.NODE_LINK }}
+
       - uses: actions/setup-node@v7
         with:
           node-version: '22'
@@ -250,6 +265,7 @@ jobs:
           # 本地代理（参考 hohai）：为空则直连；代理失败自动回退直连
           NODE_LINK: ${{ env.NODE_LINK || secrets.NODE_LINK }}
           SING_BOX_BIN: ~/sing-box-bin/sing-box
+          NODE_PROXY_IP: ${{ steps.proxy.outputs.exit-ip }}
           SING_BOX_SHA256: ${{ env.SING_BOX_SHA256 || secrets.SING_BOX_SHA256 }}
           # 可选：设为 chromium 使用新版 headless（更接近真实浏览器，验证码被拦时试试）
           PW_CHANNEL: ${{ vars.PW_CHANNEL }}
