@@ -40,14 +40,16 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
-      - name: Load shared env (env-config)
+      - name: 加载共享变量（env-config）
         uses: actions/checkout@v4
         continue-on-error: true
         with:
           repository: gxjxzhoo/env-config
           token: ${{ secrets.PRIVATE_REPO_TOKEN }}
           path: .shared-env
-      - name: Apply shared env
+          persist-credentials: false
+
+      - name: 应用共享变量
         shell: bash
         run: |
           f=.shared-env/.env
@@ -59,11 +61,14 @@ jobs:
               echo "::add-mask::$value"
               echo "$key=$value" >> "$GITHUB_ENV"
             done < "$f"
+            echo "✅ 已加载 env-config"
+          else
+            echo "⚠️ 未读到 env-config（检查 PRIVATE_REPO_TOKEN），使用仓库 Secrets"
           fi
           rm -rf .shared-env
 
       - name: 启动代理（Node_Proxy）
-        id: proxy
+        id: nodeproxy
         continue-on-error: true
         uses: gxjxzhoo/Node_Proxy@v1
         with:
@@ -126,7 +131,7 @@ jobs:
           # 本地代理（参考 hohai）：为空则直连；代理失败自动回退直连
           NODE_LINK: ${{ env.NODE_LINK || secrets.NODE_LINK }}
           SING_BOX_BIN: ~/sing-box-bin/sing-box
-          NODE_PROXY_IP: ${{ steps.proxy.outputs.exit-ip }}
+          NODE_PROXY_IP: ${{ steps.nodeproxy.outputs.exit-ip }}
           SING_BOX_SHA256: ${{ env.SING_BOX_SHA256 || secrets.SING_BOX_SHA256 }}
           # 可选：设为 chromium 使用新版 headless（更接近真实浏览器，验证码被拦时试试）
           PW_CHANNEL: ${{ vars.PW_CHANNEL }}
@@ -158,22 +163,30 @@ jobs:
             --data-urlencode "chat_id=${TG_CHAT_ID}" \
             --data-urlencode "text=❌ ACLClouds 续期 工作流在运行脚本前失败（依赖安装/下载等）：${RUN_URL}" || true
 
-      - name: 仅保留最近 10 条运行记录
+      - name: 保活（刷新工作流启用状态，防 60 天无活动被停用）
         if: always()
+        continue-on-error: true
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
         run: |
-          REPO="$GITHUB_REPOSITORY"
-          current="${{ github.run_id }}"
-          n=0
-          for id in $(gh run list --repo "$REPO" --workflow aclclouds.yml --limit 100 --json databaseId --jq '.[].databaseId'); do
-            [ "$id" = "$current" ] && continue
-            n=$((n+1))
-            if [ "$n" -gt 9 ]; then
-              echo "删除旧运行记录 $id"
-              gh run delete "$id" --repo "$REPO" || true
-            fi
-          done
+          wf=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" --jq .workflow_id)
+          gh api -X PUT "repos/$GITHUB_REPOSITORY/actions/workflows/$wf/enable" \
+            && echo "✅ 已刷新工作流启用状态" || echo "⚠️ 保活失败（不影响主任务）"
+
+      - name: 清理旧运行记录（保留最近 10 条）
+        if: always()
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          KEEP: "10"
+        run: |
+          wf=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" --jq .workflow_id)
+          gh api --paginate "repos/$GITHUB_REPOSITORY/actions/workflows/$wf/runs?per_page=100" \
+            --jq '.workflow_runs[] | select(.status == "completed") | .id' \
+            | grep -vx "$GITHUB_RUN_ID" | tail -n +"$KEEP" \
+            | while read -r id; do
+                gh api -X DELETE "repos/$GITHUB_REPOSITORY/actions/runs/$id" >/dev/null && echo "已删除运行 $id"
+              done || true
 
   power:
     if: >
@@ -183,14 +196,16 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
-      - name: Load shared env (env-config)
+      - name: 加载共享变量（env-config）
         uses: actions/checkout@v4
         continue-on-error: true
         with:
           repository: gxjxzhoo/env-config
           token: ${{ secrets.PRIVATE_REPO_TOKEN }}
           path: .shared-env
-      - name: Apply shared env
+          persist-credentials: false
+
+      - name: 应用共享变量
         shell: bash
         run: |
           f=.shared-env/.env
@@ -202,11 +217,14 @@ jobs:
               echo "::add-mask::$value"
               echo "$key=$value" >> "$GITHUB_ENV"
             done < "$f"
+            echo "✅ 已加载 env-config"
+          else
+            echo "⚠️ 未读到 env-config（检查 PRIVATE_REPO_TOKEN），使用仓库 Secrets"
           fi
           rm -rf .shared-env
 
       - name: 启动代理（Node_Proxy）
-        id: proxy
+        id: nodeproxy
         continue-on-error: true
         uses: gxjxzhoo/Node_Proxy@v1
         with:
@@ -269,7 +287,7 @@ jobs:
           # 本地代理（参考 hohai）：为空则直连；代理失败自动回退直连
           NODE_LINK: ${{ env.NODE_LINK || secrets.NODE_LINK }}
           SING_BOX_BIN: ~/sing-box-bin/sing-box
-          NODE_PROXY_IP: ${{ steps.proxy.outputs.exit-ip }}
+          NODE_PROXY_IP: ${{ steps.nodeproxy.outputs.exit-ip }}
           SING_BOX_SHA256: ${{ env.SING_BOX_SHA256 || secrets.SING_BOX_SHA256 }}
           # 可选：设为 chromium 使用新版 headless（更接近真实浏览器，验证码被拦时试试）
           PW_CHANNEL: ${{ vars.PW_CHANNEL }}
@@ -301,19 +319,27 @@ jobs:
             --data-urlencode "chat_id=${TG_CHAT_ID}" \
             --data-urlencode "text=❌ ACLClouds 保活 工作流在运行脚本前失败（依赖安装/下载等）：${RUN_URL}" || true
 
-      - name: 仅保留最近 10 条运行记录
+      - name: 保活（刷新工作流启用状态，防 60 天无活动被停用）
         if: always()
+        continue-on-error: true
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
         run: |
-          REPO="$GITHUB_REPOSITORY"
-          current="${{ github.run_id }}"
-          n=0
-          for id in $(gh run list --repo "$REPO" --workflow aclclouds.yml --limit 100 --json databaseId --jq '.[].databaseId'); do
-            [ "$id" = "$current" ] && continue
-            n=$((n+1))
-            if [ "$n" -gt 9 ]; then
-              echo "删除旧运行记录 $id"
-              gh run delete "$id" --repo "$REPO" || true
-            fi
-          done
+          wf=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" --jq .workflow_id)
+          gh api -X PUT "repos/$GITHUB_REPOSITORY/actions/workflows/$wf/enable" \
+            && echo "✅ 已刷新工作流启用状态" || echo "⚠️ 保活失败（不影响主任务）"
+
+      - name: 清理旧运行记录（保留最近 10 条）
+        if: always()
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          KEEP: "10"
+        run: |
+          wf=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" --jq .workflow_id)
+          gh api --paginate "repos/$GITHUB_REPOSITORY/actions/workflows/$wf/runs?per_page=100" \
+            --jq '.workflow_runs[] | select(.status == "completed") | .id' \
+            | grep -vx "$GITHUB_RUN_ID" | tail -n +"$KEEP" \
+            | while read -r id; do
+                gh api -X DELETE "repos/$GITHUB_REPOSITORY/actions/runs/$id" >/dev/null && echo "已删除运行 $id"
+              done || true
