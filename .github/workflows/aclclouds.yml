@@ -41,7 +41,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - name: 加载共享变量（env-config）
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         continue-on-error: true
         with:
           repository: gxjxzhoo/env-config
@@ -197,7 +197,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - name: 加载共享变量（env-config）
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         continue-on-error: true
         with:
           repository: gxjxzhoo/env-config
