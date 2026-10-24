@@ -5,8 +5,9 @@ name: ACLClouds Auto
 # - workflow_dispatch：inputs.task 选择跑哪个（all / renew / power）
 on:
   schedule:
-    # 续期：每两天 23:28 UTC（北京时间次日 07:28）
-    - cron: '28 23 */2 * *'
+    - cron: '28 0 */2 * *'   # 续期：每两天 08:28 CST（UTC 00:28），与备用同一天
+    # 续期备用：同一天 14:28 CST 补跑（当天已成功则自动跳过）
+    - cron: '28 6 */2 * *'
     # 保活：每天 02:00 / 14:00 UTC（北京时间 10:00 / 22:00）
     - cron: '0 2,14 * * *'
   workflow_dispatch:
@@ -32,10 +33,45 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  guard:
+    # 定时触发时：今天（北京时间）已有成功运行就跳过，避免主/备用定时重复执行；手动触发总是执行
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    permissions:
+      actions: read
+    outputs:
+      run: ${{ steps.chk.outputs.run }}
+    steps:
+      - id: chk
+        env:
+          GH_TOKEN: ${{ github.token }}
+          JOB: renew
+          EVENT: ${{ github.event_name }}
+          SCHED: ${{ github.event.schedule }}
+        run: |
+          if [ "$EVENT" != "schedule" ] || { [ "$SCHED" != "28 0 */2 * *" ] && [ "$SCHED" != "28 6 */2 * *" ]; }; then echo "run=true" >> "$GITHUB_OUTPUT"; exit 0; fi
+          today=$(TZ=Asia/Shanghai date +%F)
+          since=$(date -u -d "@$(TZ=Asia/Shanghai date -d "$today 00:00" +%s)" +%FT%TZ)
+          wf=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" --jq .workflow_id)
+          ids=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/$wf/runs?status=completed&created=%3E%3D$since&per_page=50" \
+            --jq ".workflow_runs[] | select(.id != $GITHUB_RUN_ID) | .id" || true)
+          for id in $ids; do
+            if gh api "repos/$GITHUB_REPOSITORY/actions/runs/$id/jobs" \
+                 --jq ".jobs[] | select(.name == \"$JOB\" and .conclusion == \"success\") | .id" | grep -q .; then
+              echo "⏭️ 今天（$today CST）已有成功运行 $id，本次定时跳过"
+              echo "run=false" >> "$GITHUB_OUTPUT"; exit 0
+            fi
+          done
+          echo "▶️ 今天还没有成功运行，继续执行"
+          echo "run=true" >> "$GITHUB_OUTPUT"
+
   renew:
+    needs: guard
     if: >
+      needs.guard.outputs.run == 'true' && (
       (github.event_name == 'workflow_dispatch' && (inputs.task == 'all' || inputs.task == 'renew')) ||
-      (github.event_name == 'schedule' && github.event.schedule == '28 23 */2 * *')
+      (github.event_name == 'schedule' && (github.event.schedule == '28 0 */2 * *' || github.event.schedule == '28 6 */2 * *'))
+      )
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
